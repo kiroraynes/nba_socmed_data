@@ -14,9 +14,9 @@ for filename in os.listdir(current_directory):
         data = pd.read_excel(file_path)
         data = data.drop_duplicates()
         data['League'] = team
-        data['Period'] = 'April 2024'
+        data['Period'] = 'May 2024'
         temp.append(data)
         merged_data = pd.concat(temp, ignore_index=True)
 
-merged_data.to_excel('apr_2024.xlsx', index=False)
+merged_data.to_excel('may_2024.xlsx', index=False)
 merged_data

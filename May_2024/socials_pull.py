@@ -176,21 +176,21 @@ for filename in files:
     #             print(e)
     #             continue
     #youtube
-    # ids = ",".join(str(elem.replace("https://www.youtube.com/channel/","")) for elem in ref['Youtube'].values if elem)
-    # url = "https://www.googleapis.com/youtube/v3/channels"
-    # params = {
-    #     "part": "statistics",
-    #     "id": ids,
-    #     "key": API_KEY
-    # }
+    ids = ",".join(str(elem.replace("https://www.youtube.com/channel/","")) for elem in ref['Youtube'].values if elem)
+    url = "https://www.googleapis.com/youtube/v3/channels"
+    params = {
+        "part": "statistics",
+        "id": ids,
+        "key": API_KEY
+    }
 
-    # response = requests.get(url, params=params)
-    # print(response.status_code, ids)
-    # if response.status_code == 200:
-    #     file = response.json()
-    #     for i in file['items']:
-    #         index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
-    #         ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
+    response = requests.get(url, params=params)
+    print(response.status_code, ids)
+    if response.status_code == 200:
+        file = response.json()
+        for i in file['items']:
+            index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
+            ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
 
 
     # Tiktok
