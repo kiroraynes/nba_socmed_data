@@ -28,7 +28,7 @@ import numpy as np
 import re
 import argparse
 
-load_dotenv()
+load_dotenv('.env')
 API_KEY = os.getenv("API_KEY")
 
 def chrome_driver(webdriver_path=None):
@@ -101,7 +101,7 @@ def is_social_media_link(url):
     return False, None
 
 async def run(url):
-    async with TwitterScrape(delay=5, headless=True) as api:
+    async with TwitterScrape(delay=5, headless=False) as api:
         init_user = api.user(url=url)
         profile = await init_user.scrape()
         return profile
@@ -117,7 +117,10 @@ async def facebook(playwright: Playwright, url) -> None:
     await page.get_by_label("Close").click()
     if url.endswith("/"):
         url = url.rstrip(url[-1])
-    elem = page.locator(f'a[href="{url}/followers/"]')
+    if 'profile.php' in url:
+        elem = page.locator(f'a[href="{url}&sk=followers"]')
+    else:
+        elem = page.locator(f'a[href="{url}/followers/"]')
     text = await elem.inner_text()
     # ---------------------
     await context.close()
@@ -160,37 +163,40 @@ for filename in files:
 
 
     #fix yt links
-    # for index, row in ref.iterrows():
-    #     if row['Youtube']:
-    #         try:
-    #             response = requests.get(row['Youtube'])
-    #             html_content = response.content
+    for index, row in ref.iterrows():
+        if row['Youtube']:
+            try:
+                response = requests.get(row['Youtube'])
+                html_content = response.content
 
-    #             # Parse the HTML content
-    #             soup = BeautifulSoup(html_content, 'html.parser')
+                # Parse the HTML content
+                soup = BeautifulSoup(html_content, 'html.parser')
 
-    #             # Find all divs with the class 'p-forge-list-item'
-    #             list_items = soup.find('link', rel='canonical')
-    #             ref.at[index,'Youtube'] = list_items.get('href')
-    #         except Exception as e:
-    #             print(e)
-    #             continue
+                # Find all divs with the class 'p-forge-list-item'
+                list_items = soup.find('link', rel='canonical')
+                ref.at[index,'Youtube'] = list_items.get('href')
+            except Exception as e:
+                print(e)
+                continue
     #youtube
-    ids = ",".join(str(elem.replace("https://www.youtube.com/channel/","")) for elem in ref['Youtube'].values if elem)
-    url = "https://www.googleapis.com/youtube/v3/channels"
-    params = {
-        "part": "statistics",
-        "id": ids,
-        "key": API_KEY
-    }
+    ids = [elem.replace("https://www.youtube.com/channel/","") for elem in ref['Youtube'].values]
+    yt_followers = []
+    batch_size = 50
+    for start in range (0, len(ref['Youtube']), batch_size):
+        string = ",".join(ids[start: start+batch_size])
+        url = "https://www.googleapis.com/youtube/v3/channels"
+        params = {
+            "part": "statistics",
+            "id": string,
+            "key": API_KEY
+        }
 
-    response = requests.get(url, params=params)
-    print(response.status_code, ids)
-    if response.status_code == 200:
-        file = response.json()
-        for i in file['items']:
-            index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
-            ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            file = response.json()
+            for i in file['items']:
+                index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
+                ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
 
 
     # Tiktok

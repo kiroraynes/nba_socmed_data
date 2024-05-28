@@ -36,8 +36,9 @@ class TwitterScrape:
 
         async def save_responses_and_body(response): 
             try:
-                response._body = await response.body()
-                self.responses.append(response)
+                if response.request.method == "GET":
+                    response._body = await response.body()
+                    self.responses.append(response)
             except Exception as e:
                 pass
         self.page.on("response", save_responses_and_body)

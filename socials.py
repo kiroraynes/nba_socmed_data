@@ -20,39 +20,37 @@ def is_social_media_link(url):
     # If no pattern matches, the URL is not recognized as a social media link
     return False, None
 async def run(playwright: Playwright):
-    browser = await playwright.chromium.launch(headless=False, slow_mo=50)
+    browser = await playwright.chromium.launch(headless=False)
     context = await browser.new_context()
     page = await context.new_page()
-    await page.goto('https://www.ligue1.com/clubs/List')
-    links = await page.locator('div.ClubListPage-list a').element_handles()
-    names = await page.evaluate('''() => {
-        const links = Array.from(document.querySelectorAll('#CompetitionClubsListPage > div.ClubListPage-container.container > div > a > div > div.ClubListPage-name > h3'));
-        return links.map(link => link.innerText);
-    }''')
-    i = 0
+    await page.goto('https://www.wnba.com/tickets')
+    await page.wait_for_selector('section.Tickets_ticketsPage__content__zLSRW')
+    sections = await page.query_selector_all('section.Tickets_ticketsPage__content__zLSRW li')
+
+    links = []
+    names = []
+
+    for li in sections:
+            # Extract h3 text
+            h3_element = await li.query_selector('h3')
+            h3_text = await h3_element.text_content()
+            names.append(h3_text)
+
+            # Extract a tags
+            a = await li.query_selector('a')
+            links.append(await a.get_attribute('href'))
     for link, team in zip(links,names):
     # Retrieve the href attribute of each link
-        href = await link.get_attribute('href')
         href_links = []
-
         # Visit the link
-        if href:
+        if link:
             # Open each link in a new tab or page
             try:
                 new_page = await page.context.new_page()
-                await new_page.goto('https://www.ligue1.com'+href)
-                if i == 0:
-                    try:
-                        await new_page.get_by_label("Disagree and close: Disagree").click()
-                    except TimeoutError:
-                        print("no cookie popup")
-                
-                async with new_page.expect_popup() as page1_info:
-                    await new_page.locator('i[class="Icon Icon-globe"]').click()
-                page1 = await page1_info.value
-                await page1.wait_for_timeout(10000)
-                await page1.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                a_tags = await page1.evaluate('''() => {
+                await new_page.goto(link)
+                await new_page.wait_for_timeout(1000)
+
+                a_tags = await new_page.evaluate('''() => {
                     const links = Array.from(document.querySelectorAll('a'));
                     return links.map(link => link.href);
                 }''')
@@ -62,9 +60,7 @@ async def run(playwright: Playwright):
                         is_valid, platform = is_social_media_link(item)
                         if is_valid:
                             href_links.append(item)
-                await page1.close()
                 await new_page.close()
-                i+=1
                 
             except Exception as e:
                 print(e)
@@ -98,7 +94,7 @@ async def main():
         sorted_teams = dict(sorted(url_to_follow_items.items()))
         sorted_teams
 
-        ref = pd.read_excel("ligue.xlsx")
+        ref = pd.read_excel("wnba.xlsx")
 
         for (index, row),(key, val)  in zip(ref.iterrows(), sorted_teams.items()):
             try:
@@ -110,7 +106,7 @@ async def main():
                         if is_valid and j==platform:
                             ref.at[index, platform] = i
                             break
-                ref.at[index, 'Unnamed: 0'] = key
+                ref.at[index, 'Teams'] = key
             except:
                 continue
             # row['Youtube'] = ([i for i in value if "youtube" in str(i)] + [""])[0]
@@ -119,7 +115,6 @@ async def main():
             # row['TikTok'] = ([i for i in value if "tiktok" in str(i)] + [""])[0]
             # row['X (Twitter)'] = ([i for i in value if "twitter" in str(i)] + [""])[0]
 
-        ref.to_excel('ligue.xlsx', index=False)
+        ref.to_excel('wnba.xlsx', index=False)
 
 asyncio.run(main())
-
