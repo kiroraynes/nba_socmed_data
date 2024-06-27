@@ -163,22 +163,23 @@ for filename in files:
 
 
     #fix yt links
-    for index, row in ref.iterrows():
-        if row['Youtube']:
-            try:
-                response = requests.get(row['Youtube'])
-                html_content = response.content
+    # for index, row in ref.iterrows():
+    #     if row['Youtube']:
+    #         try:
+    #             response = requests.get(row['Youtube'])
+    #             html_content = response.content
 
-                # Parse the HTML content
-                soup = BeautifulSoup(html_content, 'html.parser')
+    #             # Parse the HTML content
+    #             soup = BeautifulSoup(html_content, 'html.parser')
 
-                # Find all divs with the class 'p-forge-list-item'
-                list_items = soup.find('link', rel='canonical')
-                ref.at[index,'Youtube'] = list_items.get('href')
-            except Exception as e:
-                print(e)
-                continue
+    #             # Find all divs with the class 'p-forge-list-item'
+    #             list_items = soup.find('link', rel='canonical')
+    #             ref.at[index,'Youtube'] = list_items.get('href')
+    #         except Exception as e:
+    #             print(e)
+    #             continue
     #youtube
+    print("----------------------------------------In YouTube")
     ids = [elem.replace("https://www.youtube.com/channel/","") for elem in ref['Youtube'].values]
     yt_followers = []
     batch_size = 50
