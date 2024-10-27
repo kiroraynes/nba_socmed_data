@@ -1,5 +1,5 @@
 from twitter_scrape.main import TwitterScrape
-from playwright.async_api import Playwright, async_playwright, expect
+from playwright.async_api import Playwright, async_playwright, expect, sync_playwright
 from playwright_stealth import stealth_async
 import pandas as pd
 import asyncio
@@ -128,6 +128,30 @@ async def facebook(playwright: Playwright, url) -> None:
 
     return text
 
+def fetch_tiktok_followers(row):
+  with sync_playwright() as p:
+      # Launch the browser
+      browser = p.chromium.launch(headless=True)
+      context = browser.new_context(user_agent="Your custom user agent if needed")
+      page = context.new_page()
+
+      try:
+          # Navigate to the TikTok page
+          page.goto(row['TikTok'])
+          
+          # Wait for the element to be available and extract the data
+          content = page.locator("#__UNIVERSAL_DATA_FOR_REHYDRATION__").text_content()
+          state_data = json.loads(content)
+          stats_data = state_data['__DEFAULT_SCOPE__']["webapp.user-detail"]["userInfo"]['stats']
+          print(row['TikTok'], " ", stats_data['followerCount'])
+          return stats_data['followerCount']
+      except Exception as e:
+          print(f"Error processing {row['TikTok']}: {e}")
+          return None
+      finally:
+          # Close the browser
+          browser.close()
+
 files = []
 parser = argparse.ArgumentParser(description='Read an Excel file.')
 parser.add_argument('-f','--filename', type=str, help='The path to the Excel file you want to read')
@@ -142,114 +166,143 @@ else:
             files.append(filename)
 
 for filename in files:
+    def total_nans_exceed_threshold(df, columns, threshold=3):
+        total_nans = df[columns].isna().sum().sum()
+        return total_nans > threshold
+
+    # List of columns to check
+    columns_to_check = [
+        'YouTube (subscribers)',
+        'Instagram (followers)',
+        'Facebook (followers)',
+        'TikTok (followers)',
+        'X (Twitter) (followers)'
+    ]
     print("WORKING---------------",filename)
     ref = pd.read_excel(filename)
+    
     # ref['YouTube (subscribers)'] = ''
     # ref['Instagram (followers)'] = ''
     # ref['Facebook (followers)'] = ''
     # ref['TikTok (followers)'] =''
     # ref['X (Twitter) (followers)'] = ''
-    print("----------------------------------------In Twitter")
-    if __name__ == "__main__":
-        for index, row in ref.iterrows():
-            if np.isnan(row['X (Twitter) (followers)']):
-                try:
-                    profile = asyncio.run(run(row['X (Twitter)']))     
-                    print(row['X (Twitter)'], profile)
-                    ref.at[index, 'X (Twitter) (followers)'] = int(profile['follower_count'])
-                except:
-                    continue
-    ref.to_excel(filename, index=False)
+    while total_nans_exceed_threshold(ref, columns_to_check):
+        try:
+            print("----------------------------------------In Twitter")
+            if __name__ == "__main__":
+                for index, row in ref.iterrows():
+                    if np.isnan(row['X (Twitter) (followers)']):
+                        try:
+                            profile = asyncio.run(run(row['X (Twitter)']))     
+                            print(row['X (Twitter)'], profile)
+                            ref.at[index, 'X (Twitter) (followers)'] = int(profile['follower_count'])
+                        except:
+                            continue
+            ref.to_excel(filename, index=False)
 
 
-    #fix yt links
-    # for index, row in ref.iterrows():
-    #     if row['Youtube']:
-    #         try:
-    #             response = requests.get(row['Youtube'])
-    #             html_content = response.content
+            #fix yt links
+            # for index, row in ref.iterrows():
+            #     if row['Youtube']:
+            #         try:
+            #             response = requests.get(row['Youtube'])
+            #             html_content = response.content
 
-    #             # Parse the HTML content
-    #             soup = BeautifulSoup(html_content, 'html.parser')
+            #             # Parse the HTML content
+            #             soup = BeautifulSoup(html_content, 'html.parser')
 
-    #             # Find all divs with the class 'p-forge-list-item'
-    #             list_items = soup.find('link', rel='canonical')
-    #             ref.at[index,'Youtube'] = list_items.get('href')
-    #         except Exception as e:
-    #             print(e)
-    #             continue
-    #youtube
-    print("----------------------------------------In YouTube")
-    ids = [elem.replace("https://www.youtube.com/channel/","") for elem in ref['Youtube'].values]
-    yt_followers = []
-    batch_size = 50
-    for start in range (0, len(ref['Youtube']), batch_size):
-        string = ",".join(ids[start: start+batch_size])
-        url = "https://www.googleapis.com/youtube/v3/channels"
-        params = {
-            "part": "statistics",
-            "id": string,
-            "key": API_KEY
-        }
+            #             # Find all divs with the class 'p-forge-list-item'
+            #             list_items = soup.find('link', rel='canonical')
+            #             ref.at[index,'Youtube'] = list_items.get('href')
+            #         except Exception as e:
+            #             print(e)
+            #             continue
+            #youtube
+            print("----------------------------------------In YouTube")
+            ids = [elem.replace("https://www.youtube.com/channel/","") for elem in ref['Youtube'].values]
+            yt_followers = []
+            batch_size = 50
+            for start in range (0, len(ref['Youtube']), batch_size):
+                string = ",".join(ids[start: start+batch_size])
+                url = "https://www.googleapis.com/youtube/v3/channels"
+                params = {
+                    "part": "statistics",
+                    "id": string,
+                    "key": API_KEY
+                }
 
-        response = requests.get(url, params=params)
-        if response.status_code == 200:
-            file = response.json()
-            for i in file['items']:
-                index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
-                ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
-    ref.to_excel(filename, index=False)
-
-
-    # Tiktok
-    print("----------------------------------------In TikTok")
-    for index, row in ref.iterrows():
-        if np.isnan(row['TikTok (followers)']):
-            try:
-                driver = chrome_driver()
-                driver.get(row['TikTok'])
-                state_data = json.loads(driver.execute_script("return document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__').textContent"))
-                driver.close()
-                driver.quit()
-                stats_data = state_data['__DEFAULT_SCOPE__']["webapp.user-detail"]["userInfo"]['stats']
-                print(row['TikTok'], " ", stats_data['followerCount'])
-                ref.at[index, 'TikTok (followers)'] = stats_data['followerCount']
-                time.sleep(1)
-            except:
-                continue
-    ref.to_excel(filename, index=False)
+                response = requests.get(url, params=params)
+                if response.status_code == 200:
+                    file = response.json()
+                    for i in file['items']:
+                        index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
+                        ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
+            ref.to_excel(filename, index=False)
 
 
-    #Instagram
-
-    # for index,row in ref.iterrows():
-    #     try:
-    #         driver = chrome_driver()
-    #         driver.get(row['Instagram'])
-    #         time.sleep(5)
-            
-    #         for i in driver.requests:
-    #             if str(i).startswith('https://www.instagram.com/api/v1/users/web_profile_info'):
-    #                 data = sw_decode(i.response.body, i.response.headers.get('Content-Encoding', 'identity'))
-    #                 data = data.decode("utf-8")
-    #                 data = json.loads(data)
-    #                 ref.at[index, 'Instagram (followers)'] = data['data']['user']['edge_followed_by']['count']
-    #         driver.close()
-    #         driver.quit()
-    #     except:
-    #         continue
-
-    # Facebook
-    print("----------------------------------------In Facebook")
-    async def facebook_main():
-        async with async_playwright() as playwright:
+            # Tiktok
+            print("----------------------------------------In TikTok")
             for index, row in ref.iterrows():
-                if np.isnan(row['Facebook (followers)']):
-                    try:
-                        elem = await facebook(playwright,row['Facebook'])
-                        ref.at[index, 'Facebook (followers)'] = text_to_int(elem)
-                    except:
-                        continue
-    asyncio.run(facebook_main())
+                if np.isnan(row['TikTok (followers)']):
+                    follower_count = fetch_tiktok_followers(row)
+                    if follower_count is not None:
+                        ref.at[index, 'TikTok (followers)'] = follower_count
+                    # try:
+                    #     driver = chrome_driver()
+                    #     driver.get(row['TikTok'])
+                    #     state_data = json.loads(driver.execute_script("return document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__').textContent"))
+                    #     driver.close()
+                    #     driver.quit()
+                    #     stats_data = state_data['__DEFAULT_SCOPE__']["webapp.user-detail"]["userInfo"]['stats']
+                    #     print(row['TikTok'], " ", stats_data['followerCount'])
+                    #     ref.at[index, 'TikTok (followers)'] = stats_data['followerCount']
+                    #     time.sleep(1)
+                    # except:
+                    #     continue
+            ref.to_excel(filename, index=False)
 
-    ref.to_excel(filename, index=False)
+
+            #Instagram
+
+            # for index,row in ref.iterrows():
+            #     try:
+            #         driver = chrome_driver()
+            #         driver.get(row['Instagram'])
+            #         time.sleep(5)
+                    
+            #         for i in driver.requests:
+            #             if str(i).startswith('https://www.instagram.com/api/v1/users/web_profile_info'):
+            #                 data = sw_decode(i.response.body, i.response.headers.get('Content-Encoding', 'identity'))
+            #                 data = data.decode("utf-8")
+            #                 data = json.loads(data)
+            #                 ref.at[index, 'Instagram (followers)'] = data['data']['user']['edge_followed_by']['count']
+            #         driver.close()
+            #         driver.quit()
+            #     except:
+            #         continue
+
+            # Facebook
+            print("----------------------------------------In Facebook")
+            async def facebook_main():
+                async with async_playwright() as playwright:
+                    for index, row in ref.iterrows():
+                        if np.isnan(row['Facebook (followers)']):
+                            try:
+                                elem = await facebook(playwright,row['Facebook'])
+                                ref.at[index, 'Facebook (followers)'] = text_to_int(elem)
+                            except:
+                                continue
+            asyncio.run(facebook_main())
+
+            ref.to_excel(filename, index=False)
+
+        except KeyboardInterrupt:
+            print("\nProcess interrupted by user. Saving data to Excel...")
+            ref.to_excel(filename, index=False)
+            print("Data saved to 'followers_data.xlsx'. Exiting.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        finally:
+            # Ensure that data is saved even if an unexpected error occurs
+            ref.to_excel(filename, index=False)
+            print("Final data saved to 'followers_data.xlsx'.")
