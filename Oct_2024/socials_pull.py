@@ -220,27 +220,27 @@ for filename in files:
             #         except Exception as e:
             #             print(e)
             #             continue
-            #youtube
-            # print("----------------------------------------In YouTube")
-            # ids = [elem.replace("https://www.youtube.com/channel/","") for elem in ref['Youtube'].values]
-            # yt_followers = []
-            # batch_size = 50
-            # for start in range (0, len(ref['Youtube']), batch_size):
-            #     string = ",".join(ids[start: start+batch_size])
-            #     url = "https://www.googleapis.com/youtube/v3/channels"
-            #     params = {
-            #         "part": "statistics",
-            #         "id": string,
-            #         "key": API_KEY
-            #     }
+            # youtube
+            print("----------------------------------------In YouTube")
+            ids = [elem.replace("https://www.youtube.com/channel/","") for elem in ref['Youtube'].values]
+            yt_followers = []
+            batch_size = 50
+            for start in range (0, len(ref['Youtube']), batch_size):
+                string = ",".join(ids[start: start+batch_size])
+                url = "https://www.googleapis.com/youtube/v3/channels"
+                params = {
+                    "part": "statistics",
+                    "id": string,
+                    "key": API_KEY
+                }
 
-            #     response = requests.get(url, params=params)
-            #     if response.status_code == 200:
-            #         file = response.json()
-            #         for i in file['items']:
-            #             index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
-            #             ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
-            # ref.to_excel(filename, index=False)
+                response = requests.get(url, params=params)
+                if response.status_code == 200:
+                    file = response.json()
+                    for i in file['items']:
+                        index_number = ref.index[ref['Youtube'] == ("https://www.youtube.com/channel/" + str(i['id']))].tolist()
+                        ref.at[index_number[0],'YouTube (subscribers)'] = i['statistics']['subscriberCount']
+            ref.to_excel(filename, index=False)
 
 
             # Tiktok
